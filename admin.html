@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kind of Us — 後台管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --moss:#1D352E; --forest:#355347; --cream:#F6F2EA; --cream2:#EDE8DC;
+  --stone:#A8ABA0; --ink:#1A1A1A; --ink2:#3A3A3A; --ink3:#7A7A78; --white:#FFFFFF;
+  --border:rgba(26,26,26,0.10); --red:#C17070;
+  --serif:'Cormorant Garamond',serif; --sans:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--cream); color: var(--ink); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+a { text-decoration: none; color: inherit; }
+button { cursor: pointer; font-family: inherit; border: none; background: none; }
+input, textarea, select { font-family: inherit; }
+
+.login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--moss); }
+.login-box { background: var(--cream); padding: 3rem; width: 100%; max-width: 380px; margin: 1rem; }
+.login-logo { font-family: var(--serif); font-size: 22px; font-weight: 300; color: var(--moss); margin-bottom: .35rem; }
+.login-sub { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; color: var(--stone); margin-bottom: 2.5rem; }
+.login-label { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: var(--stone); display: block; margin-bottom: 6px; }
+.login-input { width: 100%; padding: 10px 0; border: none; border-bottom: 1px solid var(--border); background: transparent; font-size: 14px; color: var(--ink); display: block; margin-bottom: 1.5rem; transition: border-color .2s; }
+.login-input:focus { outline: none; border-bottom-color: var(--moss); }
+.login-input::placeholder { color: var(--stone); }
+.login-btn { width: 100%; padding: 12px; background: var(--moss); color: var(--cream); font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; border: none; transition: background .2s; margin-top: .5rem; }
+.login-btn:hover { background: var(--forest); }
+.login-err { font-family: var(--mono); font-size: 11px; color: var(--red); margin-bottom: 1rem; display: none; }
+
+.admin-wrap { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: var(--moss); flex-shrink: 0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.sidebar-brand { padding: 2rem 1.5rem 1.5rem; border-bottom: 1px solid rgba(246,242,234,.1); }
+.sidebar-name { font-family: var(--serif); font-size: 18px; font-weight: 300; color: var(--cream); margin-bottom: 3px; }
+.sidebar-tag { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: rgba(246,242,234,.3); }
+.sidebar-nav { padding: 1rem 0; flex: 1; }
+.nav-section-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; color: rgba(246,242,234,.25); padding: .75rem 1.5rem .25rem; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: .7rem 1.5rem; color: rgba(246,242,234,.5); font-size: 13px; font-weight: 300; transition: all .15s; cursor: pointer; border-left: 2px solid transparent; }
+.nav-item:hover { color: var(--cream); background: rgba(246,242,234,.05); }
+.nav-item.on { color: var(--cream); border-left-color: var(--cream); background: rgba(246,242,234,.08); }
+.nav-item svg { width: 14px; height: 14px; opacity: .6; flex-shrink: 0; }
+.nav-item.on svg { opacity: 1; }
+.sidebar-foot { padding: 1rem 1.5rem; border-top: 1px solid rgba(246,242,234,.1); }
+.sidebar-user { font-family: var(--mono); font-size: 10px; color: rgba(246,242,234,.3); letter-spacing: .3px; margin-bottom: .75rem; word-break: break-all; }
+.sidebar-logout { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: rgba(246,242,234,.4); padding: 6px 0; transition: color .15s; display: block; text-align: left; }
+.sidebar-logout:hover { color: var(--cream); }
+
+.main { flex: 1; overflow-x: hidden; }
+.topbar { background: var(--white); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+.page-title { font-family: var(--serif); font-size: 20px; font-weight: 300; color: var(--moss); }
+.view-site { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--stone); padding: 6px 14px; border: 1px solid var(--border); border-radius: 2px; transition: all .15s; }
+.view-site:hover { color: var(--moss); border-color: var(--moss); }
+
+.panel { display: none; padding: 2rem; }
+.panel.on { display: block; }
+
+.card { background: var(--white); border: 1px solid var(--border); padding: 1.75rem; margin-bottom: 1.25rem; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: .75rem; }
+.card-title { font-family: var(--serif); font-size: 18px; font-weight: 300; color: var(--moss); }
+.card-count { font-family: var(--mono); font-size: 10px; color: var(--stone); letter-spacing: .5px; }
+
+.field-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 1.25rem; }
+.field-label { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: var(--stone); }
+.field-input { padding: 9px 12px; border: 1px solid var(--border); background: var(--cream); color: var(--ink); font-size: 13px; transition: border-color .2s; border-radius: 0; width: 100%; }
+.field-input:focus { outline: none; border-color: var(--moss); background: var(--white); }
+.field-input::placeholder { color: var(--stone); }
+.field-ta { min-height: 80px; resize: vertical; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+.btn { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; padding: 9px 20px; border-radius: 2px; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--moss); color: var(--cream); border: 1px solid var(--moss); }
+.btn-primary:hover { background: var(--forest); border-color: var(--forest); }
+.btn-ghost { color: var(--stone); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--ink); border-color: var(--ink3); }
+.btn-danger { color: var(--red); border: 1px solid rgba(193,112,112,.3); }
+.btn-danger:hover { background: rgba(193,112,112,.08); }
+.btn-sm { font-size: 9px; padding: 6px 12px; }
+.btn-group { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead tr { border-bottom: 1px solid var(--border); }
+thead th { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: var(--stone); text-align: left; padding: .6rem .75rem; font-weight: 400; white-space: nowrap; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+tbody tr:hover { background: rgba(29,53,46,.03); }
+tbody tr:last-child { border-bottom: none; }
+tbody td { padding: .9rem .75rem; font-size: 13px; color: var(--ink2); vertical-align: top; }
+.td-name { font-weight: 500; color: var(--ink); max-width: 180px; }
+.td-desc { color: var(--ink3); font-size: 12px; max-width: 240px; line-height: 1.5; }
+.td-mono { font-family: var(--mono); font-size: 11px; color: var(--stone); }
+.td-actions { display: flex; gap: .5rem; align-items: center; white-space: nowrap; }
+.tag-badge { font-family: var(--mono); font-size: 9px; letter-spacing: .8px; padding: 2px 8px; border: 1px solid var(--border); color: var(--stone); border-radius: 1px; display: inline-block; }
+
+.modal-bg { position: fixed; inset: 0; background: rgba(26,26,26,.6); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.modal-bg.open { opacity: 1; pointer-events: auto; }
+.modal { background: var(--white); width: 100%; max-width: 560px; margin: 1rem; max-height: 90vh; overflow-y: auto; transform: translateY(8px); transition: transform .2s; }
+.modal-bg.open .modal { transform: translateY(0); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1.5rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--white); }
+.modal-head-title { font-family: var(--serif); font-size: 18px; font-weight: 300; color: var(--moss); }
+.modal-close { font-family: var(--mono); font-size: 11px; color: var(--stone); }
+.modal-close:hover { color: var(--ink); }
+.modal-body { padding: 1.5rem; }
+.modal-foot { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; gap: .75rem; justify-content: flex-end; position: sticky; bottom: 0; background: var(--white); }
+
+.about-block { background: var(--white); border: 1px solid var(--border); margin-bottom: 1.25rem; overflow: hidden; }
+.about-block-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--cream); flex-wrap: wrap; gap: .5rem; }
+.about-block-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; color: var(--stone); }
+.about-block-body { padding: 1.5rem; }
+
+.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 2rem; }
+.stat-card { background: var(--white); border: 1px solid var(--border); padding: 1.25rem 1.5rem; }
+.stat-val { font-family: var(--mono); font-size: 28px; font-weight: 300; color: var(--moss); letter-spacing: -1px; }
+.stat-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: var(--stone); margin-top: 4px; }
+
+.toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--moss); color: var(--cream); font-family: var(--mono); font-size: 11px; letter-spacing: .5px; padding: 10px 20px; z-index: 200; pointer-events: none; transform: translateY(60px); transition: transform .25s; }
+.toast.show { transform: translateY(0); }
+
+.hidden { display: none !important; }
+.text-stone { color: var(--stone); font-family: var(--mono); font-size: 11px; }
+.empty-msg { padding: 3rem; text-align: center; font-family: var(--mono); font-size: 11px; color: var(--stone); letter-spacing: 1px; }
+
+@media (max-width: 760px) {
+  .admin-wrap { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: relative; }
+  .field-row, .field-row-3, .stats-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Kind of Us</div>
+    <div class="login-sub">ADMIN PANEL</div>
+    <div class="login-err" id="login-err"></div>
+    <label class="login-label">EMAIL</label>
+    <input class="login-input" id="l-email" type="email" placeholder="your@email.com">
+    <label class="login-label">PASSWORD</label>
+    <input class="login-input" id="l-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">登入後台</button>
+  </div>
+</div>
+
+<div id="admin-wrap" class="admin-wrap hidden">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-name">Kind of Us</div>
+      <div class="sidebar-tag">ADMIN PANEL</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-lbl">OVERVIEW</div>
+      <div class="nav-item on" onclick="goPanel('dashboard',this)">總覽</div>
+      <div class="nav-section-lbl">CONTENT</div>
+      <div class="nav-item" onclick="goPanel('orgs',this)">公益單位</div>
+      <div class="nav-item" onclick="goPanel('posts',this)">社會議題文章</div>
+      <div class="nav-item" onclick="goPanel('about',this)">關於頁面文字</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sidebar-user" id="sidebar-email">—</div>
+      <button class="sidebar-logout" onclick="doLogout()">登出 →</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <span class="page-title" id="page-title">總覽</span>
+      <a class="view-site" href="index.html" target="_blank">查看網站 →</a>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="panel on" id="panel-dashboard">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-val" id="stat-orgs">—</div><div class="stat-lbl">公益單位</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-posts">—</div><div class="stat-lbl">社會議題文章</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-favs">—</div><div class="stat-lbl">收藏次數</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">快速操作</span></div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="goPanel('orgs'); openOrgModal()">＋ 新增公益單位</button>
+          <button class="btn btn-ghost" onclick="goPanel('posts'); togglePostCompose()">＋ 新增文章</button>
+          <button class="btn btn-ghost" onclick="goPanel('about')">編輯關於頁面</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">最新文章</span></div>
+        <div id="dash-posts"><div class="empty-msg">載入中...</div></div>
+      </div>
+    </div>
+
+    <!-- ORGS -->
+    <div class="panel hidden" id="panel-orgs">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">公益單位</span>
+          <div class="btn-group">
+            <span class="card-count" id="orgs-count"></span>
+            <button class="btn btn-primary btn-sm" onclick="openOrgModal()">＋ 新增單位</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>單位名稱</th><th>類別</th><th>縣市</th><th>年均募款</th><th>簡介</th><th>操作</th></tr></thead>
+            <tbody id="orgs-tbody"><tr><td colspan="6"><div class="empty-msg">載入中...</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- POSTS -->
+    <div class="panel hidden" id="panel-posts">
+      <div id="post-compose-wrap" class="card hidden">
+        <div class="card-header">
+          <span class="card-title" id="compose-mode-title">新增文章</span>
+          <button class="btn btn-ghost btn-sm" onclick="cancelPostEdit()">取消</button>
+        </div>
+        <div class="field-group">
+          <label class="field-label">文章標題</label>
+          <input class="field-input" id="pc-title" type="text" placeholder="文章標題">
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">分類</label>
+            <select class="field-input" id="pc-cat">
+              <option>拜訪心得</option><option>捐款思考</option><option>議題觀察</option><option>觀察筆記</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">相關單位（選填）</label>
+            <input class="field-input" id="pc-org" type="text" placeholder="相關單位名稱">
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">內文</label>
+          <textarea class="field-input field-ta" id="pc-body" placeholder="文章內容..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="savePostAdmin()">發佈文章</button>
+          <button class="btn btn-ghost" onclick="cancelPostEdit()">取消</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">社會議題文章</span>
+          <button class="btn btn-primary btn-sm" onclick="togglePostCompose()">＋ 新增文章</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>標題</th><th>分類</th><th>相關單位</th><th>發佈日期</th><th>操作</th></tr></thead>
+            <tbody id="posts-tbody"><tr><td colspan="5"><div class="empty-msg">載入中...</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABOUT -->
+    <div class="panel hidden" id="panel-about">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">關於頁面文字</span>
+          <span class="text-stone">修改後點「儲存所有修改」立即生效</span>
+        </div>
+
+        <div class="about-block">
+          <div class="about-block-header"><span class="about-block-lbl">HERO 標語</span><span class="text-stone">首頁大標題下方</span></div>
+          <div class="about-block-body">
+            <div class="field-group"><label class="field-label">副標語</label><input class="field-input" id="ab-hero-desc" placeholder="我們不直接幫助誰。而是整理資訊⋯"></div>
+          </div>
+        </div>
+
+        <div class="about-block">
+          <div class="about-block-header"><span class="about-block-lbl">關於區塊 — 主文</span><span class="text-stone">左側大標題與三段正文</span></div>
+          <div class="about-block-body">
+            <div class="field-group"><label class="field-label">大標題（可用 &lt;br&gt; 換行、&lt;em&gt; 斜體）</label><input class="field-input" id="ab-about-headline" placeholder="讓善意成為一種日常文化。"></div>
+            <div class="field-group"><label class="field-label">第一段</label><textarea class="field-input field-ta" id="ab-p1"></textarea></div>
+            <div class="field-group"><label class="field-label">第二段</label><textarea class="field-input field-ta" id="ab-p2"></textarea></div>
+            <div class="field-group"><label class="field-label">第三段</label><textarea class="field-input field-ta" id="ab-p3"></textarea></div>
+          </div>
+        </div>
+
+        <div class="about-block">
+          <div class="about-block-header"><span class="about-block-lbl">核心信念（四項）</span><span class="text-stone">右側列表</span></div>
+          <div class="about-block-body" id="values-editor"></div>
+        </div>
+
+        <div class="about-block">
+          <div class="about-block-header"><span class="about-block-lbl">引言區塊</span><span class="text-stone">深墨綠背景的大引言</span></div>
+          <div class="about-block-body">
+            <div class="field-group"><label class="field-label">引言文字（可用 &lt;br&gt; 換行）</label><textarea class="field-input field-ta" id="ab-quote"></textarea></div>
+            <div class="field-group"><label class="field-label">引言來源</label><input class="field-input" id="ab-cite"></div>
+          </div>
+        </div>
+
+        <div class="about-block">
+          <div class="about-block-header"><span class="about-block-lbl">聯繫頁面</span><span class="text-stone">「與我聯繫」頁面文字</span></div>
+          <div class="about-block-body">
+            <div class="field-group"><label class="field-label">聯繫頁標語</label><input class="field-input" id="ab-contact-intro"></div>
+            <div class="field-group"><label class="field-label">聯繫頁說明文字</label><textarea class="field-input field-ta" id="ab-contact-body"></textarea></div>
+            <div class="field-row-3">
+              <div class="field-group"><label class="field-label">EMAIL</label><input class="field-input" id="ab-email"></div>
+              <div class="field-group"><label class="field-label">INSTAGRAM</label><input class="field-input" id="ab-ig"></div>
+              <div class="field-group"><label class="field-label">位置</label><input class="field-input" id="ab-location"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin-top:1rem">
+          <button class="btn btn-primary" onclick="saveAbout()">儲存所有修改</button>
+          <span class="text-stone" id="about-saved" style="display:none">✓ 已儲存</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-bg" id="org-modal-bg" onclick="closeOrgModalBg(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-head-title" id="org-modal-title">新增公益單位</span>
+      <button class="modal-close" onclick="closeOrgModal()">✕ 關閉</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">單位名稱</label><input class="field-input" id="om-name" type="text" placeholder="例：家扶基金會"></div>
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">服務類別</label>
+          <select class="field-input" id="om-type">
+            <option value="兒少">兒少教育</option><option value="長者">長者照護</option>
+            <option value="身障">身心障礙</option><option value="動物">動物保護</option>
+            <option value="環境">環境生態</option><option value="綜合">綜合社福</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">所在縣市</label>
+          <select class="field-input" id="om-city">
+            <option>台北</option><option>台中</option><option>高雄</option><option>台南</option><option>新北</option><option>桃園</option><option>其他</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">年均募款金額（億元）</label><input class="field-input" id="om-fund" type="number" step="0.1" min="0" placeholder="例：2.5"></div>
+        <div class="field-group"><label class="field-label">官網網址</label><input class="field-input" id="om-url" type="url" placeholder="https://..."></div>
+      </div>
+      <div class="field-group"><label class="field-label">簡介</label><textarea class="field-input field-ta" id="om-desc" placeholder="一兩句話介紹這個單位的核心工作。"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeOrgModal()">取消</button>
+      <button class="btn btn-primary" id="om-save-btn" onclick="saveOrg()">儲存單位</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL      = 'https://amxuewlxbhbimsqjpchj.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_74i7hvw4DAYA-70fI3J6XQ_FYA5Sz7N';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null, editingOrgId = null, editingPostId = null;
+
+sb.auth.getSession().then(({data:{session}}) => { if(session) enterAdmin(session.user); });
+
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const pw    = document.getElementById('l-pw').value;
+  const errEl = document.getElementById('login-err');
+  errEl.style.display = 'none';
+  if(!email||!pw){ errEl.textContent='請填寫信箱與密碼'; errEl.style.display='block'; return; }
+  const {data,error} = await sb.auth.signInWithPassword({email,password:pw});
+  if(error){ errEl.textContent='信箱或密碼錯誤，請確認後再試。'; errEl.style.display='block'; return; }
+  enterAdmin(data.user);
+}
+function enterAdmin(user) {
+  currentUser = user;
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('admin-wrap').classList.remove('hidden');
+  document.getElementById('sidebar-email').textContent = user.email;
+  initValuesEditor();
+  loadAll();
+}
+async function doLogout() { await sb.auth.signOut(); location.reload(); }
+
+async function loadAll() { await Promise.all([loadOrgs(), loadPosts(), loadAbout()]); }
+
+const PANEL_TITLES = { dashboard:'總覽', orgs:'公益單位', posts:'社會議題文章', about:'關於頁面文字' };
+function goPanel(id, btn) {
+  document.querySelectorAll('.panel').forEach(p=>{ p.classList.remove('on'); p.classList.add('hidden'); });
+  document.getElementById('panel-'+id).classList.remove('hidden');
+  document.getElementById('panel-'+id).classList.add('on');
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  document.getElementById('page-title').textContent = PANEL_TITLES[id]||'';
+}
+
+/* ORGS */
+let allOrgs = [];
+const TYPE_LABELS = {兒少:'CHILDREN',長者:'ELDERLY',身障:'DISABILITY',動物:'ANIMAL',環境:'ENVIRONMENT',綜合:'GENERAL'};
+async function loadOrgs() {
+  const {data} = await sb.from('orgs').select('*').order('name');
+  allOrgs = data||[];
+  renderOrgsTable();
+  document.getElementById('stat-orgs').textContent = allOrgs.length;
+  document.getElementById('orgs-count').textContent = allOrgs.length + ' 個單位';
+}
+function fmtFund(v) {
+  if(!v) return '—';
+  if(v>=1) return (v%1===0?v:parseFloat(v).toFixed(1))+'億';
+  return Math.round(v*10000).toLocaleString()+'萬';
+}
+function renderOrgsTable() {
+  const tbody = document.getElementById('orgs-tbody');
+  if(!allOrgs.length){ tbody.innerHTML='<tr><td colspan="6"><div class="empty-msg">尚無資料。點「新增單位」開始建立。</div></td></tr>'; return; }
+  tbody.innerHTML = allOrgs.map(o=>`
+    <tr>
+      <td class="td-name">${o.name}</td>
+      <td><span class="tag-badge">${TYPE_LABELS[o.type]||o.type}</span></td>
+      <td class="td-mono">${o.city||''}</td>
+      <td class="td-mono">${fmtFund(o.fund_avg)}</td>
+      <td class="td-desc">${o.description||''}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editOrg('${o.id}')">編輯</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteOrg('${o.id}',\`${(o.name||'').replace(/`/g,'')}\`)">刪除</button>
+      </div></td>
+    </tr>
+  `).join('');
+}
+function openOrgModal(id) {
+  editingOrgId = id||null;
+  const isEdit = !!id;
+  document.getElementById('org-modal-title').textContent = isEdit ? '編輯公益單位' : '新增公益單位';
+  document.getElementById('om-save-btn').textContent = isEdit ? '儲存修改' : '儲存單位';
+  if(isEdit) {
+    const o = allOrgs.find(x=>x.id===id);
+    if(!o) return;
+    document.getElementById('om-name').value  = o.name||'';
+    document.getElementById('om-type').value  = o.type||'兒少';
+    document.getElementById('om-city').value  = o.city||'台北';
+    document.getElementById('om-fund').value  = o.fund_avg||'';
+    document.getElementById('om-url').value   = o.url||'';
+    document.getElementById('om-desc').value  = o.description||'';
+  } else {
+    ['om-name','om-fund','om-url','om-desc'].forEach(id=>document.getElementById(id).value='');
+  }
+  document.getElementById('org-modal-bg').classList.add('open');
+}
+function closeOrgModal() { document.getElementById('org-modal-bg').classList.remove('open'); editingOrgId=null; }
+function closeOrgModalBg(e) { if(e.target===document.getElementById('org-modal-bg')) closeOrgModal(); }
+function editOrg(id) { openOrgModal(id); }
+async function saveOrg() {
+  const name = document.getElementById('om-name').value.trim();
+  if(!name){ toast('請填寫單位名稱'); return; }
+  const payload = {
+    name,
+    type: document.getElementById('om-type').value,
+    city: document.getElementById('om-city').value,
+    fund_avg: parseFloat(document.getElementById('om-fund').value)||0,
+    url: document.getElementById('om-url').value.trim(),
+    description: document.getElementById('om-desc').value.trim(),
+  };
+  if(editingOrgId) {
+    const {error} = await sb.from('orgs').update(payload).eq('id',editingOrgId);
+    if(error){ toast('儲存失敗：'+error.message); return; }
+    toast('已更新：'+name);
+  } else {
+    const {error} = await sb.from('orgs').insert(payload);
+    if(error){ toast('新增失敗：'+error.message); return; }
+    toast('已新增：'+name);
+  }
+  closeOrgModal(); loadOrgs();
+}
+async function deleteOrg(id, name) {
+  if(!confirm(`確定刪除「${name}」？此操作無法復原。`)) return;
+  await sb.from('orgs').delete().eq('id',id);
+  toast('已刪除：'+name); loadOrgs();
+}
+
+/* POSTS */
+let allPosts = [];
+async function loadPosts() {
+  const {data} = await sb.from('posts').select('*').order('created_at',{ascending:false});
+  allPosts = data||[];
+  renderPostsTable(); renderDashPosts();
+  document.getElementById('stat-posts').textContent = allPosts.length;
+}
+function renderPostsTable() {
+  const tbody = document.getElementById('posts-tbody');
+  if(!allPosts.length){ tbody.innerHTML='<tr><td colspan="5"><div class="empty-msg">尚無文章。</div></td></tr>'; return; }
+  tbody.innerHTML = allPosts.map(p=>`
+    <tr>
+      <td class="td-name" style="max-width:200px">${p.title}</td>
+      <td><span class="tag-badge">${p.cat||''}</span></td>
+      <td class="td-mono">${p.org||'—'}</td>
+      <td class="td-mono">${(p.created_at||'').slice(0,10)}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editPost('${p.id}')">編輯</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePost('${p.id}',\`${(p.title||'').replace(/`/g,'')}\`)">刪除</button>
+      </div></td>
+    </tr>
+  `).join('');
+}
+function renderDashPosts() {
+  const el = document.getElementById('dash-posts');
+  const recent = allPosts.slice(0,5);
+  if(!recent.length){ el.innerHTML='<div class="empty-msg">尚無文章</div>'; return; }
+  el.innerHTML = `<table><thead><tr><th>標題</th><th>分類</th><th>日期</th></tr></thead><tbody>${
+    recent.map(p=>`<tr><td class="td-name">${p.title}</td><td><span class="tag-badge">${p.cat||''}</span></td><td class="td-mono">${(p.created_at||'').slice(0,10)}</td></tr>`).join('')
+  }</tbody></table>`;
+}
+function togglePostCompose() {
+  const w = document.getElementById('post-compose-wrap');
+  w.classList.toggle('hidden');
+  if(!w.classList.contains('hidden')) {
+    editingPostId = null;
+    document.getElementById('compose-mode-title').textContent = '新增文章';
+    ['pc-title','pc-org','pc-body'].forEach(id=>document.getElementById(id).value='');
+  }
+}
+function cancelPostEdit() { document.getElementById('post-compose-wrap').classList.add('hidden'); editingPostId = null; }
+function editPost(id) {
+  const p = allPosts.find(x=>x.id===id);
+  if(!p) return;
+  editingPostId = id;
+  document.getElementById('compose-mode-title').textContent = '編輯文章';
+  document.getElementById('pc-title').value = p.title||'';
+  document.getElementById('pc-cat').value   = p.cat||'拜訪心得';
+  document.getElementById('pc-org').value   = p.org||'';
+  document.getElementById('pc-body').value  = p.body||'';
+  document.getElementById('post-compose-wrap').classList.remove('hidden');
+  document.getElementById('post-compose-wrap').scrollIntoView({behavior:'smooth'});
+}
+async function savePostAdmin() {
+  const title = document.getElementById('pc-title').value.trim();
+  const body  = document.getElementById('pc-body').value.trim();
+  if(!title||!body){ toast('請填寫標題與內文'); return; }
+  const payload = {
+    title, body,
+    cat: document.getElementById('pc-cat').value,
+    org: document.getElementById('pc-org').value.trim(),
+    user_id: currentUser.id,
+  };
+  if(editingPostId) {
+    const {error} = await sb.from('posts').update(payload).eq('id',editingPostId);
+    if(error){ toast('儲存失敗'); return; }
+    toast('文章已更新');
+  } else {
+    const {error} = await sb.from('posts').insert(payload);
+    if(error){ toast('發佈失敗'); return; }
+    toast('文章已發佈');
+  }
+  cancelPostEdit(); loadPosts();
+}
+async function deletePost(id, title) {
+  if(!confirm(`確定刪除「${title}」？`)) return;
+  await sb.from('posts').delete().eq('id',id);
+  toast('已刪除'); loadPosts();
+}
+
+/* ABOUT */
+const VALUE_DEFAULTS = [
+  {title:'資訊透明', desc:'捐款是一種信任。信任需要資訊作基礎，而不是情緒。'},
+  {title:'不喜歡口號', desc:'真正的改變很緩慢，也很具體。我們不誇大，也不煽情。'},
+  {title:'在乎公平', desc:'每一個議題都值得被看見，不論它是否「容易被捐款」。'},
+  {title:'善意是日常', desc:'不必等到有錢才開始。關注、分享、了解，都是一種參與。'},
+];
+function initValuesEditor() {
+  const el = document.getElementById('values-editor');
+  el.innerHTML = VALUE_DEFAULTS.map((v,i)=>`
+    <div class="field-row" style="margin-bottom:.75rem">
+      <div class="field-group"><label class="field-label">信念 ${i+1} 標題</label><input class="field-input" id="val-title-${i}" value="${v.title}"></div>
+      <div class="field-group"><label class="field-label">說明文字</label><input class="field-input" id="val-desc-${i}" value="${v.desc}"></div>
+    </div>
+  `).join('');
+}
+async function loadAbout() {
+  const {data} = await sb.from('site_content').select('value').eq('key','about').maybeSingle();
+  if(data?.value) populateAboutForm(JSON.parse(data.value));
+  else populateAboutForm({
+    heroDesc:'我們不直接幫助誰。而是整理資訊，讓每一個善意的決定，都更有方向。',
+    aboutHeadline:'讓善意<br>成為<em>一種</em><br>日常文化。',
+    p1:'Kind of Us 不是一個公益組織，也不直接提供服務。我們做的事，是整理資訊。',
+    p2:'在捐款之前，很多人不知道從哪裡開始——哪個組織真的在做事、資金怎麼流動、這筆錢會用在哪裡。我們試著讓這件事變得簡單一點。',
+    p3:'我們相信，一個人做出有知識的善意決定，比任何行銷都更有力量。',
+    quote:'「一個人做出有知識的善意決定，<br>比任何行銷都更有力量。」',
+    cite:'KIND OF US · 品牌核心',
+    contactIntro:'「有任何想說的，<br>都可以寫給我們。」',
+    contactBody:'Kind of Us 是一個持續進行中的計畫。如果你有想推薦的公益單位、想分享的故事，或只是想聊聊，都歡迎來信。',
+    email:'hello@kindofus.tw', ig:'@kindofus.tw', location:'Taiwan',
+    values: VALUE_DEFAULTS,
+  });
+  const {count} = await sb.from('favourites').select('*',{count:'exact',head:true});
+  document.getElementById('stat-favs').textContent = count||0;
+}
+function populateAboutForm(d) {
+  if(!d) return;
+  const safe = (id, val) => { const el=document.getElementById(id); if(el && val!==undefined) el.value=val; };
+  safe('ab-hero-desc', d.heroDesc);
+  safe('ab-about-headline', d.aboutHeadline);
+  safe('ab-p1', d.p1); safe('ab-p2', d.p2); safe('ab-p3', d.p3);
+  safe('ab-quote', d.quote); safe('ab-cite', d.cite);
+  safe('ab-contact-intro', d.contactIntro); safe('ab-contact-body', d.contactBody);
+  safe('ab-email', d.email); safe('ab-ig', d.ig); safe('ab-location', d.location);
+  if(d.values) d.values.forEach((v,i)=>{ safe('val-title-'+i, v.title); safe('val-desc-'+i, v.desc); });
+}
+async function saveAbout() {
+  const get = id => document.getElementById(id)?.value||'';
+  const values = VALUE_DEFAULTS.map((_,i)=>({ title:get('val-title-'+i), desc:get('val-desc-'+i) }));
+  const payload = {
+    heroDesc: get('ab-hero-desc'),
+    aboutHeadline: get('ab-about-headline'),
+    p1:get('ab-p1'), p2:get('ab-p2'), p3:get('ab-p3'),
+    quote:get('ab-quote'), cite:get('ab-cite'),
+    contactIntro:get('ab-contact-intro'), contactBody:get('ab-contact-body'),
+    email:get('ab-email'), ig:get('ab-ig'), location:get('ab-location'),
+    values,
+  };
+  const {error} = await sb.from('site_content').upsert({key:'about', value: JSON.stringify(payload)},{onConflict:'key'});
+  if(error){ toast('儲存失敗：'+error.message); return; }
+  toast('已儲存！前台將自動更新。');
+  const saved = document.getElementById('about-saved');
+  saved.style.display='inline';
+  setTimeout(()=>saved.style.display='none', 3000);
+}
+
+let toastTimer;
+function toast(msg) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
+解釋
+目前顯示的是「admin.html」。
